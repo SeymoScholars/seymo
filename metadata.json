@@ -1,0 +1,8 @@
+{
+  "name": "Remix SeymoScholars",
+  "description": "Educational platform for grades 3 to 10 offering math, science, and English courses.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
