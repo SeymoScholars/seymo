@@ -33,7 +33,7 @@ export default function Footer({ onEnrollClick }: { onEnrollClick: () => void })
               <li><Link to="/" className="hover:text-white transition-colors">Home</Link></li>
               <li><Link to="/about" className="hover:text-white transition-colors">About Us</Link></li>
               <li><a href="/about#philosophy" className="hover:text-white transition-colors">Why Choose Us</a></li>
-              <li><Link to="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+              <li><Link to="/blog" className="hover:text-white transition-colors">Resources</Link></li>
               <li><Link to="/success-stories" className="hover:text-white transition-colors">Success Stories</Link></li>
             </ul>
           </div>

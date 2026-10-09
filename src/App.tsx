@@ -26,11 +26,16 @@ import SuccessStories from './pages/SuccessStories';
 import RoboticsAIPage from './pages/RoboticsAIPage';
 import ForSchools from './pages/ForSchools';
 import HowWeTeach from './pages/HowWeTeach';
+import Admin from './pages/Admin';
 
 export default function App() {
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
 
   useEffect(() => {
+    if (window.location.pathname !== '/admin' && /(?:invite_token|recovery_token|confirmation_token|access_token)=/.test(window.location.hash)) {
+      window.location.replace(`/admin${window.location.hash}`);
+      return;
+    }
     const handleOpenModal = () => setIsEnrollModalOpen(true);
     window.addEventListener('open-enroll-modal', handleOpenModal);
     return () => window.removeEventListener('open-enroll-modal', handleOpenModal);
@@ -56,6 +61,9 @@ export default function App() {
               <Route path="/grades/9-10" element={<Grade9to10Page />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogDetails />} />
+              <Route path="/resources" element={<Blog />} />
+              <Route path="/resources/:slug" element={<BlogDetails />} />
+              <Route path="/admin" element={<Admin />} />
               <Route path="/success-stories" element={<SuccessStories />} />
               <Route path="/for-schools" element={<ForSchools />} />
               <Route path="/how-we-teach" element={<HowWeTeach />} />
