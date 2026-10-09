@@ -27,33 +27,33 @@ export default function Blog() {
   return (
     <>
       <Helmet>
-        <title>Blog | SeymoScholars</title>
-        <meta name="description" content="Read our latest insights on education, parenting, and learning methodologies tailored for Indian students." />
-        <meta name="keywords" content="SeymoScholars blog, educational insights, Indian school curriculum, parenting tips, learning methodolgies" />
-        <meta property="og:title" content="Blog | SeymoScholars" />
-        <meta property="og:description" content="Read our latest insights on education, parenting, and learning methodologies tailored for Indian students." />
+        <title>Seymo Scholars Resources</title>
+        <meta name="description" content="Explore educational resources, expert insights, STEM activities, technology guides, and practical learning materials for students, parents, teachers, and schools." />
+        <meta name="keywords" content="Seymo Scholars Resources, educational resources, expert insights, STEM activities, technology guides, practical learning materials" />
+        <meta property="og:title" content="Seymo Scholars Resources" />
+        <meta property="og:description" content="Explore educational resources, expert insights, STEM activities, technology guides, and practical learning materials for students, parents, teachers, and schools." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://seymoscholars.com/blog" />
+        <meta property="og:url" content="https://seymoscholars.org/resources" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Blog | SeymoScholars" />
-        <meta name="twitter:description" content="Read our latest insights on education, parenting, and learning methodologies tailored for Indian students." />
-        <link rel="canonical" href="https://seymoscholars.com/blog" />
+        <meta name="twitter:title" content="Seymo Scholars Resources" />
+        <meta name="twitter:description" content="Explore educational resources, expert insights, STEM activities, technology guides, and practical learning materials for students, parents, teachers, and schools." />
+        <link rel="canonical" href="https://seymoscholars.org/resources" />
         <script type="application/ld+json">
           {`{
             "@context": "https://schema.org",
-            "@type": "Blog",
-            "name": "Blog | SeymoScholars",
-            "description": "Read our latest insights on education, parenting, and learning methodologies tailored for Indian students.",
-            "url": "https://seymoscholars.com/blog"
+            "@type": "CollectionPage",
+            "name": "Seymo Scholars Resources",
+            "description": "Explore educational resources, expert insights, STEM activities, technology guides, and practical learning materials for students, parents, teachers, and schools.",
+            "url": "https://seymoscholars.org/resources"
           }`}
         </script>
       </Helmet>
 
       <section className="pt-32 pb-20 bg-slate-50 relative border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl font-black text-slate-900 mb-6">SeymoScholars Blog</h1>
+          <h1 className="text-5xl font-black text-slate-900 mb-6">Seymo Scholars Resources</h1>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            Insights, advice, and perspectives on modern education from our expert educators.
+            Explore educational resources, expert insights, STEM activities, technology guides, and practical learning materials for students, parents, teachers, and schools.
           </p>
         </div>
       </section>
@@ -62,7 +62,7 @@ export default function Blog() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
             <div className="flex justify-center items-center py-20">
-              <div className="text-xl font-bold text-slate-600 animate-pulse">Loading blogs...</div>
+              <div className="text-xl font-bold text-slate-600 animate-pulse">Loading resources...</div>
             </div>
           ) : error ? (
             <div className="flex justify-center items-center py-20">
@@ -77,7 +77,7 @@ export default function Blog() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 {posts.map((post) => (
                   <article key={post.slug} className="group cursor-pointer">
-                    <Link to={`/blog/${post.slug}`} className="block">
+                    <Link to={`/resources/${post.slug}`} className="block">
                       <div className="relative rounded-[32px] overflow-hidden mb-6 aspect-[16/10]">
                         <img 
                           src={post.coverImage} 

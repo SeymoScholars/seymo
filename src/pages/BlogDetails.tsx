@@ -19,11 +19,11 @@ export default function BlogDetails() {
           if (data) {
             setBlog(data);
           } else {
-            setError("Blog not found.");
+            setError("Resource not found.");
           }
         }
       } catch (err: any) {
-        setError(err.message || "Failed to reach the blog service. Please try again later.");
+        setError(err.message || "Failed to reach the resource service. Please try again later.");
       } finally {
         setLoading(false);
       }
@@ -34,7 +34,7 @@ export default function BlogDetails() {
   if (loading) {
     return (
       <div className="min-h-screen pt-40 pb-20 flex justify-center items-center">
-        <div className="text-xl font-bold text-slate-600 animate-pulse">Loading blog...</div>
+        <div className="text-xl font-bold text-slate-600 animate-pulse">Loading resource...</div>
       </div>
     );
   }
@@ -42,9 +42,9 @@ export default function BlogDetails() {
   if (error || !blog) {
     return (
       <div className="min-h-screen pt-40 pb-20 flex flex-col justify-center items-center px-4">
-        <h1 className="text-3xl font-black text-slate-900 mb-4">{error || "Blog not found."}</h1>
-        <Link to="/blog" className="text-indigo-600 font-bold flex items-center gap-2 hover:gap-3 transition-all">
-          <ArrowLeft className="w-5 h-5" /> Back to Blog
+        <h1 className="text-3xl font-black text-slate-900 mb-4">{error || "Resource not found."}</h1>
+        <Link to="/resources" className="text-indigo-600 font-bold flex items-center gap-2 hover:gap-3 transition-all">
+          <ArrowLeft className="w-5 h-5" /> Back to Resources
         </Link>
       </div>
     );
@@ -53,13 +53,13 @@ export default function BlogDetails() {
   return (
     <>
       <Helmet>
-        <title>{blog.title} | SeymoScholars Blog</title>
+        <title>{blog.title} | Seymo Scholars Resources</title>
         <meta name="description" content={blog.summary} />
       </Helmet>
       
       <article className="pt-32 pb-24 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Link to="/blog" className="inline-flex items-center gap-2 text-slate-500 hover:text-indigo-600 font-bold mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4" /> Back to Blog
+        <Link to="/resources" className="inline-flex items-center gap-2 text-slate-500 hover:text-indigo-600 font-bold mb-8 transition-colors">
+          <ArrowLeft className="w-4 h-4" /> Back to Resources
         </Link>
         
         <div className="mb-8">

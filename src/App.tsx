@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { ImageProvider } from './hooks/useImage';
 import Navbar from './components/Navbar';
@@ -26,6 +26,7 @@ import SuccessStories from './pages/SuccessStories';
 import RoboticsAIPage from './pages/RoboticsAIPage';
 import ForSchools from './pages/ForSchools';
 import HowWeTeach from './pages/HowWeTeach';
+import Admin from './pages/Admin';
 
 export default function App() {
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
@@ -41,11 +42,19 @@ export default function App() {
       <ImageProvider>
         <BrowserRouter>
         <ScrollToTop />
+        <Routes>
+          <Route path="/admin/*" element={<Admin />} />
+          <Route element={
         <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50/60 via-white to-white font-sans text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 relative">
           <Navbar onEnrollClick={() => setIsEnrollModalOpen(true)} />
           <main>
-            <Routes>
-              <Route path="/" element={<Home onEnrollClick={() => setIsEnrollModalOpen(true)} />} />
+            <Outlet />
+          </main>
+          <Footer onEnrollClick={() => setIsEnrollModalOpen(true)} />
+          <EnrollModal isOpen={isEnrollModalOpen} onClose={() => setIsEnrollModalOpen(false)} />
+        </div>
+          }>
+              <Route path="/" element={/#(?:[^#]*&)?(?:invite_token|recovery_token|confirmation_token|access_token)=/.test(window.location.hash) ? <Navigate to={`/admin${window.location.hash}`} replace /> : <Home onEnrollClick={() => setIsEnrollModalOpen(true)} />} />
               <Route path="/about" element={<About />} />
               <Route path="/subjects/mathematics" element={<MathPage />} />
               <Route path="/subjects/science" element={<SciencePage />} />
@@ -54,16 +63,15 @@ export default function App() {
               <Route path="/grades/3-5" element={<Grade3to5Page />} />
               <Route path="/grades/6-8" element={<Grade6to8Page />} />
               <Route path="/grades/9-10" element={<Grade9to10Page />} />
-              <Route path="/blog" element={<Blog />} />
+              <Route path="/resources" element={<Blog />} />
+              <Route path="/resources/:slug" element={<BlogDetails />} />
+              <Route path="/blog" element={<Navigate to="/resources" replace />} />
               <Route path="/blog/:slug" element={<BlogDetails />} />
               <Route path="/success-stories" element={<SuccessStories />} />
               <Route path="/for-schools" element={<ForSchools />} />
               <Route path="/how-we-teach" element={<HowWeTeach />} />
-            </Routes>
-          </main>
-          <Footer onEnrollClick={() => setIsEnrollModalOpen(true)} />
-          <EnrollModal isOpen={isEnrollModalOpen} onClose={() => setIsEnrollModalOpen(false)} />
-        </div>
+          </Route>
+        </Routes>
       </BrowserRouter>
       </ImageProvider>
     </HelmetProvider>
