@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { BlogPost, fetchBlogs } from '../services/blogService';
+import { ArticleSummary } from '../editorial/ArticleTemplate';
 
 export default function Blog() {
   const [posts, setPosts] = useState<BlogPost[]>([]);
@@ -27,31 +28,31 @@ export default function Blog() {
   return (
     <>
       <Helmet>
-        <title>Blog | SeymoScholars</title>
+        <title>Resources | SeymoScholars</title>
         <meta name="description" content="Read our latest insights on education, parenting, and learning methodologies tailored for Indian students." />
         <meta name="keywords" content="SeymoScholars blog, educational insights, Indian school curriculum, parenting tips, learning methodolgies" />
-        <meta property="og:title" content="Blog | SeymoScholars" />
+        <meta property="og:title" content="Resources | SeymoScholars" />
         <meta property="og:description" content="Read our latest insights on education, parenting, and learning methodologies tailored for Indian students." />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://seymoscholars.com/blog" />
+        <meta property="og:url" content="https://seymoscholars.org/resources" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Blog | SeymoScholars" />
+        <meta name="twitter:title" content="Resources | SeymoScholars" />
         <meta name="twitter:description" content="Read our latest insights on education, parenting, and learning methodologies tailored for Indian students." />
-        <link rel="canonical" href="https://seymoscholars.com/blog" />
+        <link rel="canonical" href="https://seymoscholars.org/resources" />
         <script type="application/ld+json">
           {`{
             "@context": "https://schema.org",
             "@type": "Blog",
-            "name": "Blog | SeymoScholars",
+            "name": "Resources | SeymoScholars",
             "description": "Read our latest insights on education, parenting, and learning methodologies tailored for Indian students.",
-            "url": "https://seymoscholars.com/blog"
+            "url": "https://seymoscholars.org/resources"
           }`}
         </script>
       </Helmet>
 
       <section className="pt-32 pb-20 bg-slate-50 relative border-b border-slate-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-5xl font-black text-slate-900 mb-6">SeymoScholars Blog</h1>
+          <h1 className="text-5xl font-black text-slate-900 mb-6">SeymoScholars Resources</h1>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
             Insights, advice, and perspectives on modern education from our expert educators.
           </p>
@@ -62,7 +63,7 @@ export default function Blog() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
             <div className="flex justify-center items-center py-20">
-              <div className="text-xl font-bold text-slate-600 animate-pulse">Loading blogs...</div>
+              <div className="text-xl font-bold text-slate-600 animate-pulse">Loading resources...</div>
             </div>
           ) : error ? (
             <div className="flex justify-center items-center py-20">
@@ -70,14 +71,14 @@ export default function Blog() {
             </div>
           ) : posts.length === 0 ? (
             <div className="flex justify-center items-center py-20">
-              <div className="text-xl font-bold text-slate-600">No blogs found.</div>
+              <div className="text-xl font-bold text-slate-600">No resources found.</div>
             </div>
           ) : (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                 {posts.map((post) => (
                   <article key={post.slug} className="group cursor-pointer">
-                    <Link to={`/blog/${post.slug}`} className="block">
+                    <Link to={`${post.editorial ? '/resources' : '/blog'}/${post.slug}`} className="block">
                       <div className="relative rounded-[32px] overflow-hidden mb-6 aspect-[16/10]">
                         <img 
                           src={post.coverImage} 
@@ -102,13 +103,12 @@ export default function Blog() {
                         {post.title}
                       </h3>
                       
-                      <p className="text-slate-600 leading-relaxed mb-6">
-                        {post.summary}
-                      </p>
+                    </Link>
+
+                    <ArticleSummary article={post.editorial || { summary: post.summary }} articlePath={`${post.editorial ? '/resources' : '/blog'}/${post.slug}`} className="text-slate-600 leading-relaxed mb-6" />
                       
-                      <span className="text-indigo-600 font-bold flex items-center gap-2 group-hover:gap-3 transition-all">
+                    <Link to={`${post.editorial ? '/resources' : '/blog'}/${post.slug}`} className="text-indigo-600 font-bold flex items-center gap-2 group-hover:gap-3 transition-all">
                         Continue Reading <ArrowRight className="w-4 h-4" />
-                      </span>
                     </Link>
                   </article>
                 ))}

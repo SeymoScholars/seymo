@@ -1,3 +1,6 @@
+import { getArticle, listArticles } from '../editorial/api';
+import type { ArticleContent, ArticleRecord } from '../editorial/model';
+
 export interface BlogPost {
   slug: string;
   title: string;
@@ -7,6 +10,7 @@ export interface BlogPost {
   coverImage: string;
   summary: string;
   content: string;
+  editorial?: ArticleContent;
 }
 
 const MOCK_BLOGS: BlogPost[] = [
@@ -78,7 +82,7 @@ The KUA framework is not a linear path but a continuous cycle. Application often
 // Replace this with your actual Google Apps Script Web App URL after deployment
 const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL || '';
 
-export async function fetchBlogs(): Promise<BlogPost[]> {
+async function fetchLegacyBlogs(): Promise<BlogPost[]> {
   if (APPS_SCRIPT_URL) {
     try {
       const response = await fetch(APPS_SCRIPT_URL);
@@ -93,7 +97,7 @@ export async function fetchBlogs(): Promise<BlogPost[]> {
   return MOCK_BLOGS;
 }
 
-export async function fetchBlogBySlug(slug: string): Promise<BlogPost | null> {
+async function fetchLegacyBlogBySlug(slug: string): Promise<BlogPost | null> {
   if (APPS_SCRIPT_URL) {
     try {
       const response = await fetch(`${APPS_SCRIPT_URL}?slug=${slug}`);
@@ -111,4 +115,31 @@ export async function fetchBlogBySlug(slug: string): Promise<BlogPost | null> {
   }
   const blog = MOCK_BLOGS.find((b) => b.slug === slug);
   return blog || null;
+}
+
+function editorialPost(record: ArticleRecord): BlogPost {
+  return {
+    slug: record.slug, title: record.document.title, date: record.document.date,
+    author: record.document.author, category: record.document.category,
+    coverImage: record.document.heroImage, summary: record.document.summary,
+    content: '', editorial: record.document,
+  };
+}
+
+export async function fetchBlogs(): Promise<BlogPost[]> {
+  const [published, legacy] = await Promise.all([listArticles(), fetchLegacyBlogs()]);
+  const slugs = new Set(published.map(record => record.slug));
+  return [...published.map(editorialPost), ...legacy.filter(post => !slugs.has(post.slug))];
+}
+
+export async function fetchBlogBySlug(slug: string): Promise<BlogPost | null> {
+  try {
+    const record = await getArticle(slug);
+    if (record) return editorialPost(record);
+  } catch (error) {
+    const legacy = await fetchLegacyBlogBySlug(slug);
+    if (legacy) return legacy;
+    throw error;
+  }
+  return fetchLegacyBlogBySlug(slug);
 }
