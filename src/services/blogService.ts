@@ -78,7 +78,7 @@ The KUA framework is not a linear path but a continuous cycle. Application often
 // Replace this with your actual Google Apps Script Web App URL after deployment
 const APPS_SCRIPT_URL = import.meta.env.VITE_APPS_SCRIPT_URL || '';
 
-export async function fetchBlogs(): Promise<BlogPost[]> {
+export async function fetchLegacyBlogs(): Promise<BlogPost[]> {
   if (APPS_SCRIPT_URL) {
     try {
       const response = await fetch(APPS_SCRIPT_URL);
@@ -93,7 +93,34 @@ export async function fetchBlogs(): Promise<BlogPost[]> {
   return MOCK_BLOGS;
 }
 
+async function fetchManagedBlogs(): Promise<{ articles: BlogPost[]; managedSlugs: string[] } | null> {
+  try {
+    const response = await fetch('/.netlify/functions/articles', { signal: AbortSignal.timeout(5000) });
+    if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return null;
+    const data = await response.json();
+    return Array.isArray(data.articles) && Array.isArray(data.managedSlugs) ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchBlogs(): Promise<BlogPost[]> {
+  const [existing, managed] = await Promise.all([fetchLegacyBlogs(), fetchManagedBlogs()]);
+  if (!managed) return existing;
+  const published = new Map(managed.articles.map(article => [article.slug, article]));
+  const managedSlugs = new Set(managed.managedSlugs);
+  const articles = existing.flatMap(article => {
+    if (!managedSlugs.has(article.slug)) return [article];
+    const replacement = published.get(article.slug);
+    published.delete(article.slug);
+    return replacement ? [replacement] : [];
+  });
+  return [...published.values(), ...articles];
+}
+
 export async function fetchBlogBySlug(slug: string): Promise<BlogPost | null> {
+  const managed = await fetchManagedBlogs();
+  if (managed?.managedSlugs.includes(slug)) return managed.articles.find(article => article.slug === slug) || null;
   if (APPS_SCRIPT_URL) {
     try {
       const response = await fetch(`${APPS_SCRIPT_URL}?slug=${slug}`);

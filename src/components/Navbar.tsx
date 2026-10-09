@@ -47,7 +47,7 @@ export default function Navbar({ onEnrollClick }: { onEnrollClick: () => void })
     { title: 'Grades', path: '/#grades' },
     { title: 'Beyond Barriers', path: '/programs/robotics-ai' },
     { title: 'About Us', path: '/about' },
-    { title: 'Blog', path: '/blog' },
+    { title: 'Resources', path: '/resources' },
     { title: 'How We Teach', path: '/how-we-teach' },
     { title: 'For Schools', path: '/for-schools' }
   ];
