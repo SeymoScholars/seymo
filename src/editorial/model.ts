@@ -44,7 +44,7 @@ const summaryDocument = document.refine(function validLinks(node: RichNode): boo
   return (node.marks || []).every(mark => mark.type !== 'link' || Boolean(mark.attrs?.href && safeSummaryLink(mark.attrs.href))) && (node.content || []).every(validLinks);
 }, 'Summary links must use HTTPS or a relative internal URL.').refine(value => richTextToPlainText(value).length <= 1500, 'Keep the summary within 1,500 characters.');
 
-export const articleSchema = z.object({
+const articleFields = z.object({
   category: z.string().trim().min(1).max(120),
   topic: z.string().trim().max(200),
   title: z.string().trim().min(1).max(300),
@@ -76,10 +76,33 @@ export const articleSchema = z.object({
   ctaUrl: z.union([z.literal(''), link]),
   references: z.array(z.object({ id: z.string().uuid(), title: z.string().trim().min(1).max(500), url: link })).max(100),
   editorialNote: z.string().max(3000),
-}).refine(value => new Set(value.sections.map(section => section.id)).size === value.sections.length, 'Article section IDs must be unique.').transform(value => ({ ...value, summary: value.summaryContent ? richTextToPlainText(value.summaryContent) : value.summary }));
+});
+
+export const articleSchema = articleFields.refine(value => new Set(value.sections.map(section => section.id)).size === value.sections.length, 'Article section IDs must be unique.').transform(value => ({ ...value, summary: value.summaryContent ? richTextToPlainText(value.summaryContent) : value.summary }));
+
+export const draftSchema = articleFields.extend({
+  category: z.string().max(120),
+  topic: z.string().max(200),
+  title: z.string().max(300),
+  summary: z.string().max(1500),
+  author: z.string().max(120),
+  date: z.string().max(30),
+  heroImage: z.string().max(2048),
+  ctaUrl: z.string().max(2048),
+  sections: z.array(articleFields.shape.sections.element.extend({ image: z.string().max(2048) })).max(100),
+  references: z.array(z.object({ id: z.string().uuid(), title: z.string().max(500), url: z.string().max(2048) })).max(100),
+}).refine(value => new Set(value.sections.map(section => section.id)).size === value.sections.length, 'Article section IDs must be unique.');
 
 export type ArticleContent = z.infer<typeof articleSchema>;
-export type ArticleRecord = { id: string; slug: string; status: 'draft' | 'published'; revision: number; document: ArticleContent };
+export type ArticleRecord = { id: string; slug: string; status: 'draft' | 'scheduled' | 'published'; revision: number; document: ArticleContent; scheduledAt: string | null; publishedAt: string | null; publicationError: string | null; publicationAttempts: number; lastPublicationAttemptAt: string | null };
+
+export function publicationProblem(content: ArticleContent): string | null {
+  const validation = articleSchema.safeParse(content);
+  if (!validation.success) return validation.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; ');
+  if (brokenSummarySectionLinks(content).length) return 'Fix the broken summary section links before publishing or scheduling.';
+  if (!content.heroImage || !content.heroAlt || !hasContent(content.introduction)) return 'Publishing requires a hero image, image description, and introduction.';
+  return null;
+}
 export type ArticleSectionTarget = { id: string; label: string };
 export const sectionAnchorId = (id: string) => `section-${id}`;
 export function articleSectionTargets(article: ArticleContent): ArticleSectionTarget[] {

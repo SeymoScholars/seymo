@@ -77,6 +77,20 @@
 .admin-modal h2 { font-size: 26px; font-weight: 700; margin-bottom: 16px; }
 .admin-modal p { margin-bottom: 24px; }
 .admin-modal button { margin-right: 12px; }
+.admin-dashboard { border: 1px solid #d8dec9; background: #f8faef; padding: 22px; margin: 22px 0; }
+.admin-dashboard h2 { font-size: 24px; font-weight: 700; margin: 18px 0 8px; }
+.admin-dashboard-help { font-size: 13px; color: #626b54; margin-bottom: 16px; }
+.admin-article-list { display: grid; gap: 12px; max-height: 360px; overflow: auto; }
+.admin-article-card { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; padding: 18px; background: #fff; border: 1px solid #c9d1bf; }
+.admin-article-card > div { min-width: 0; }
+.admin-article-card h3 { font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
+.admin-article-card p { font-size: 13px; margin-top: 6px; }
+.admin-card-actions, .admin-publishing-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.admin-publishing { margin-top: 28px; }
+.admin-publishing-actions button { padding: 14px 22px; font-weight: 700; }
+.admin-publishing .admin-card-actions { margin-top: 16px; }
+.admin-modal h3 { font-size: 20px; font-weight: 700; margin-bottom: 12px; overflow-wrap: anywhere; }
+.admin-modal button { margin-bottom: 10px; }
 @container editorial (max-width: 700px) {
   .editorial-intro-grid { grid-template-columns: minmax(0, 1fr); }
   .editorial-masthead { text-align: left; }

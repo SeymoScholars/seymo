@@ -14,8 +14,11 @@ export async function getArticle(slug: string): Promise<ArticleRecord | null> {
   if (!response.ok) throw new Error('The article service is unavailable. Please retry.');
   return response.json();
 }
-export const saveArticle = (document: ArticleContent, status: ArticleRecord['status'], record?: ArticleRecord | null) => api<ArticleRecord>(record ? `/api/admin/articles/${record.id}` : '/api/admin/articles', {
-  method: record ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ document, status, revision: record?.revision }),
+export const saveArticle = (document: ArticleContent, status: ArticleRecord['status'], record?: ArticleRecord | null, scheduledAt?: string) => api<ArticleRecord>(record ? `/api/admin/articles/${record.id}` : '/api/admin/articles', {
+  method: record ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ document, status, revision: record?.revision, scheduledAt }),
+});
+export const deleteArticle = (record: ArticleRecord) => api<{ deleted: boolean }>(`/api/admin/articles/${record.id}`, {
+  method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ revision: record.revision }),
 });
 export async function uploadImage(file: File): Promise<string> {
   if (file.size > 4_000_000) throw new Error('Choose an image smaller than 4 MB.');
