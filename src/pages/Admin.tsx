@@ -4,8 +4,9 @@ import { Helmet } from 'react-helmet-async';
 import { acceptInvite, getUser, handleAuthCallback, login, logout, requestPasswordRecovery, updateUser, type User } from '@netlify/identity';
 import ArticleTemplate from '../editorial/ArticleTemplate';
 import RichTextEditor from '../editorial/RichTextEditor';
-import { listArticles, saveArticle, uploadImage } from '../editorial/api';
-import { articleSchema, articleSectionTargets, brokenSummarySectionLinks, emptyDocument, newArticle, richTextToPlainText, summaryDocumentFor, type ArticleContent, type ArticleRecord, type RichNode } from '../editorial/model';
+import { deleteArticle, listArticles, saveArticle, uploadImage } from '../editorial/api';
+import { articleSectionTargets, brokenSummarySectionLinks, draftSchema, emptyDocument, newArticle, publicationProblem, richTextToPlainText, summaryDocumentFor, type ArticleContent, type ArticleRecord, type RichNode } from '../editorial/model';
+import { formatPublicationTime, istToUtc, publicationTimezone, utcToIstFields } from '../editorial/publicationTime';
 import '../editorial/admin.css';
 
 function Field({ label, value, onChange, type = 'text', required = false, multiline = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; required?: boolean; multiline?: boolean }) {
@@ -61,8 +62,18 @@ export default function Admin() {
   const [view, setView] = useState<'split' | 'edit' | 'preview'>('split');
   const [mobilePreview, setMobilePreview] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [filter, setFilter] = useState<ArticleRecord['status']>('draft');
+  const [scheduleStep, setScheduleStep] = useState<'choose' | 'confirm' | null>(null);
+  const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('');
+  const [scheduleInstant, setScheduleInstant] = useState('');
+  const [scheduleError, setScheduleError] = useState('');
+  const [deleting, setDeleting] = useState<ArticleRecord | null>(null);
+  const [autosaving, setAutosaving] = useState(false);
+  const [autosavePaused, setAutosavePaused] = useState(false);
+  const saveLock = useRef(false);
   const dirty = saved !== JSON.stringify(article);
-  const busy = saving || uploading;
+  const busy = saving || uploading || autosaving;
 
   async function refreshList() {
     setListError('');
@@ -93,6 +104,31 @@ export default function Admin() {
     return () => window.removeEventListener('beforeunload', beforeUnload);
   }, [dirty]);
 
+  useEffect(() => {
+    if (!dirty || !isAdministrator(user) || (record && record.status !== 'draft') || busy || autosavePaused || pendingAction || scheduleStep || deleting) return;
+    const timeout = window.setTimeout(() => { void persist('draft', undefined, true); }, 2000);
+    return () => window.clearTimeout(timeout);
+  }, [article, dirty, user, record, busy, autosavePaused, pendingAction, scheduleStep, deleting]);
+
+  useEffect(() => {
+    if (!pendingAction && !scheduleStep && !deleting) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const modal = document.querySelector<HTMLElement>('.admin-modal');
+    const focusable = () => Array.from(modal?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex="0"]') || []);
+    focusable()[0]?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) { setPendingAction(null); setScheduleStep(null); setDeleting(null); }
+      if (event.key !== 'Tab') return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements[elements.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    };
+    document.addEventListener('keydown', keydown);
+    return () => { document.removeEventListener('keydown', keydown); previous?.focus(); };
+  }, [pendingAction, scheduleStep, deleting, busy]);
+
   function switchArticle(action: () => void) {
     if (dirty) setPendingAction(() => action);
     else action();
@@ -105,6 +141,7 @@ export default function Admin() {
     setSaved(JSON.stringify(document));
     setError('');
     setNotice('');
+    setAutosavePaused(false);
   }
 
   function change<Key extends keyof ArticleContent>(key: Key, value: ArticleContent[Key]) {
@@ -126,28 +163,72 @@ export default function Admin() {
     });
   }
 
-  async function persist(status: ArticleRecord['status']) {
+  async function persist(status: ArticleRecord['status'], scheduledAt?: string, automatic = false) {
+    if (saveLock.current) return;
     setError('');
-    setNotice('');
-    if (status === 'published' && brokenSummarySectionLinks(article).length) {
-      setError('Fix the broken summary section links before publishing. Choose a replacement section or remove each broken link.');
-      return;
-    }
-    const validation = articleSchema.safeParse(article);
+    if (!automatic) setNotice('');
+    const validation = draftSchema.safeParse(article);
     if (!validation.success) {
       setError(validation.error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`).join('; '));
+      if (automatic) setAutosavePaused(true);
       return;
     }
-    setSaving(true);
+    const problem = status !== 'draft' ? publicationProblem(validation.data) : null;
+    if (problem) { setError(problem); return; }
+    saveLock.current = true;
+    if (automatic) setAutosaving(true); else setSaving(true);
     try {
-      const next = await saveArticle(validation.data, status, record);
+      const next = await saveArticle(validation.data, status, record, scheduledAt || (status === 'scheduled' ? record?.scheduledAt || undefined : undefined));
       setRecord(next);
-      setArticle(next.document);
+      if (!automatic) setArticle(next.document);
       setSaved(JSON.stringify(next.document));
       setRecords(current => [next, ...current.filter(item => item.id !== next.id)]);
-      setNotice(status === 'published' ? 'Published. This article is now available on Resources.' : record?.status === 'published' ? 'Unpublished. The article is retained as a draft.' : 'Draft saved. It is not visible to readers.');
-    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Unable to save. Your content remains in the editor.'); }
-    finally { setSaving(false); }
+      if (!automatic) setFilter(status);
+      setAutosavePaused(false);
+      setScheduleStep(null);
+      setNotice(status === 'published' ? 'Published. This article is now available on Resources.' : status === 'scheduled' ? `Scheduled for ${formatPublicationTime(next.scheduledAt!)}. It stays private until automatic publication.` : record?.status === 'scheduled' ? 'Schedule cancelled. Your article is saved as a private draft.' : record?.status === 'published' ? 'Unpublished. The article is retained as a draft.' : automatic ? 'Draft automatically saved to the database. It is not visible to readers.' : 'Draft saved. It is not visible to readers.');
+    } catch (failure) {
+      const message = failure instanceof Error ? failure.message : 'Unable to save. Your content remains in the editor.';
+      setError(message);
+      if (scheduleStep) setScheduleError(message);
+      setAutosavePaused(true);
+    }
+    finally { saveLock.current = false; setSaving(false); setAutosaving(false); }
+  }
+
+  function startSchedule() {
+    const initial = utcToIstFields(record?.scheduledAt && new Date(record.scheduledAt).getTime() > Date.now() ? record.scheduledAt : new Date(Date.now() + 3600_000).toISOString());
+    setScheduleDate(initial.date);
+    setScheduleTime(initial.time);
+    setScheduleError('');
+    setScheduleStep('choose');
+  }
+
+  function reviewSchedule(event: FormEvent) {
+    event.preventDefault();
+    try {
+      const instant = istToUtc(scheduleDate, scheduleTime);
+      if (new Date(instant).getTime() <= Date.now()) throw new Error('Choose a future publication date and time.');
+      const problem = publicationProblem(article);
+      if (problem) throw new Error(problem);
+      setScheduleInstant(instant);
+      setScheduleError('');
+      setScheduleStep('confirm');
+    } catch (failure) { setScheduleError(failure instanceof Error ? failure.message : 'Invalid schedule.'); }
+  }
+
+  async function removeDraft() {
+    if (!deleting || saveLock.current) return;
+    saveLock.current = true;
+    setSaving(true);
+    try {
+      await deleteArticle(deleting);
+      setRecords(current => current.filter(item => item.id !== deleting.id));
+      if (record?.id === deleting.id) openArticle(null);
+      setDeleting(null);
+      setNotice('Draft deleted.');
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Unable to delete draft.'); setDeleting(null); }
+    finally { saveLock.current = false; setSaving(false); }
   }
 
   async function authenticate(event: FormEvent) {
@@ -196,22 +277,35 @@ export default function Admin() {
     </div> : <>
       <div className="admin-actions">
         <div className="admin-view-controls" aria-label="Workspace view">{(['edit', 'split', 'preview'] as const).map(option => <button key={option} type="button" aria-pressed={view === option} onClick={() => setView(option)}>{option === 'split' ? 'Editor + preview' : option === 'edit' ? 'Editor' : 'Preview'}</button>)}</div>
-        <span className="admin-status">{uploading ? 'Uploading image…' : dirty ? 'Unsaved changes' : record?.status === 'published' ? 'Published' : 'Draft'}</span>
-        <button type="button" disabled={busy} onClick={() => void persist(record?.status || 'draft')}>{saving ? 'Saving…' : record?.status === 'published' ? 'Save published changes' : 'Save draft'}</button>
-        {record?.status === 'published' ? <button type="button" disabled={busy} onClick={() => void persist('draft')}>Unpublish</button> : <button type="button" className="admin-primary" disabled={busy} onClick={() => void persist('published')}>Publish article</button>}
+        <span className="admin-status">{uploading ? 'Uploading image…' : autosaving ? 'Auto-saving draft…' : dirty ? 'Unsaved changes' : record?.status === 'published' ? 'Published' : record?.status === 'scheduled' ? 'Scheduled' : 'Draft'}</span>
+        <button type="button" disabled={busy} onClick={() => void persist(record?.status || 'draft')}>{saving ? 'Saving…' : record?.status === 'published' ? 'Save published changes' : record?.status === 'scheduled' ? 'Save scheduled changes' : 'Save draft'}</button>
+        {record?.status === 'published' && <button type="button" disabled={busy} onClick={() => void persist('draft')}>Unpublish</button>}
+        {record?.status === 'scheduled' && <button type="button" disabled={busy} onClick={() => void persist('draft')}>Cancel schedule</button>}
         <button type="button" disabled={busy} onClick={() => switchArticle(() => { void signOut(); })}>Sign out</button>
       </div>
       {error && <p className="admin-error" role="alert">{error}</p>}
       {notice && <p className="admin-notice" role="status">{notice}</p>}
-      {record && <p className="admin-url">Article URL: <Link to={`/resources/${record.slug}`}>/resources/{record.slug}</Link>{record.status === 'draft' && ' (available publicly after publishing)'}</p>}
+      {record && <p className="admin-url">Article URL: {record.status === 'published' ? <Link to={`/resources/${record.slug}`}>/resources/{record.slug}</Link> : <span>/resources/{record.slug} (private until published)</span>}{record.status === 'scheduled' && record.scheduledAt && <><br />Scheduled: {formatPublicationTime(record.scheduledAt)}</>}{record.status === 'published' && <><br />Published: {record.publishedAt ? formatPublicationTime(record.publishedAt) : `${record.document.date} (original article date; exact publication time was not recorded)`}</>}</p>}
       <div className="admin-library">
         <button type="button" disabled={busy} onClick={() => switchArticle(() => openArticle(null))}>+ New article</button>
         <label>Saved articles <select aria-label="Open a saved article" disabled={busy} value={record?.id || ''} onChange={event => { const next = records.find(item => item.id === event.target.value); if (next) switchArticle(() => openArticle(next)); }}><option value="">Choose an article</option>{records.map(item => <option key={item.id} value={item.id}>{item.document.title} — {item.status}</option>)}</select></label>
         <button type="button" disabled={busy} onClick={() => void refreshList()}>Refresh list</button>
         {listError && <p className="admin-error" role="alert">{listError}</p>}
       </div>
+      <section className="admin-dashboard" aria-label="Article dashboard">
+        <div className="admin-view-controls" aria-label="Filter article status">{(['draft', 'scheduled', 'published'] as const).map(status => <button key={status} type="button" aria-pressed={filter === status} onClick={() => setFilter(status)}>{status === 'draft' ? 'Drafts' : status === 'scheduled' ? 'Scheduled Articles' : 'Published Articles'} ({records.filter(item => item.status === status).length})</button>)}</div>
+        <h2>{filter === 'draft' ? 'Drafts' : filter === 'scheduled' ? 'Scheduled Articles' : 'Published Articles'}</h2>
+        <p className="admin-dashboard-help">Drafts auto-save after a pause in typing. Scheduled and published changes require an explicit save.</p>
+        {records.filter(item => item.status === filter).length === 0 && <p>No {filter} articles yet.</p>}
+        <div className="admin-article-list">{records.filter(item => item.status === filter).map(item => <article key={item.id} className="admin-article-card">
+          <div><h3>{item.document.title || 'Untitled draft'}</h3><p>{item.status === 'scheduled' && item.scheduledAt ? `Scheduled: ${formatPublicationTime(item.scheduledAt)}` : item.status === 'published' ? `Published: ${item.publishedAt ? formatPublicationTime(item.publishedAt) : `${item.document.date} (original article date)`}` : 'Private draft'}</p>
+          {item.publicationError && <p className="admin-error" role="alert">{item.publicationError} Attempts: {item.publicationAttempts}.{item.lastPublicationAttemptAt && ` Last attempt: ${formatPublicationTime(item.lastPublicationAttemptAt)}`}</p>}
+          {item.status === 'scheduled' && item.scheduledAt && new Date(item.scheduledAt).getTime() < Date.now() && !item.publicationError && <p>Publication is due. Refresh to check status; if delayed, open the article to publish immediately.</p>}</div>
+          <div className="admin-card-actions"><button type="button" disabled={busy} onClick={() => switchArticle(() => openArticle(item))}>Open / edit</button><button type="button" disabled={busy} onClick={() => switchArticle(() => { openArticle(item); setView('preview'); })}>Preview</button>{item.status === 'draft' && <button type="button" disabled={busy} onClick={() => switchArticle(() => setDeleting(item))}>Delete draft</button>}</div>
+        </article>)}</div>
+      </section>
       <div className={`admin-workspace admin-view-${view}`}>
-        {view !== 'preview' && <fieldset className="admin-editor" disabled={busy}>
+        {view !== 'preview' && <fieldset className="admin-editor" disabled={saving || uploading}>
           <legend className="sr-only">Article content</legend>
           <section className="admin-panel"><h2>01 / Article header</h2>
             <Field label="Category" value={article.category} onChange={value => change('category', value)} required />
@@ -253,7 +347,15 @@ export default function Admin() {
         </fieldset>}
         {view !== 'edit' && <section className="admin-preview-panel" aria-label="Live article preview"><div className="admin-preview-heading"><h2>Live preview</h2><button type="button" aria-pressed={mobilePreview} onClick={() => setMobilePreview(!mobilePreview)}>{mobilePreview ? 'Desktop width' : 'Mobile width'}</button><p>The same template renders the published article.</p></div><div className={`admin-preview-frame${mobilePreview ? ' admin-preview-mobile' : ''}`}><ArticleTemplate article={article} preview /></div></section>}
       </div>
+      <section className="admin-publishing admin-panel" aria-label="Publishing options"><h2>06 / Save &amp; publish</h2><p>Your article content and preview keep the same editorial format. Scheduling uses {publicationTimezone}.</p>
+        <div className="admin-publishing-actions"><button type="button" disabled={busy} onClick={() => void persist('draft')}>Save as Draft</button><button type="button" disabled={busy} onClick={startSchedule}>Schedule Publication</button><button type="button" className="admin-primary" disabled={busy} onClick={() => void persist('published')}>Publish Now</button></div>
+        {record?.status === 'scheduled' && <div className="admin-card-actions"><button type="button" disabled={busy} onClick={startSchedule}>Reschedule</button><button type="button" disabled={busy} onClick={() => void persist('draft')}>Cancel scheduled publication</button>{record.publicationError && <button type="button" disabled={busy} onClick={() => void persist('published')}>Retry publication now</button>}</div>}
+        {record?.status === 'published' && <p>Saving as a draft or scheduling this published article removes it from public view until it is published again.</p>}
+        {notice && <p className="admin-notice" role="status">{notice}</p>}{error && <p className="admin-error" role="alert">{error}</p>}
+      </section>
     </>}
+    {scheduleStep && <div className="admin-modal-backdrop"><div className="admin-modal" role="dialog" aria-modal="true" aria-labelledby="schedule-heading"><h2 id="schedule-heading">{scheduleStep === 'choose' ? 'Schedule Publication' : 'Confirm publication schedule'}</h2><p>{publicationTimezone}</p>{scheduleStep === 'choose' ? <form onSubmit={reviewSchedule}><Field label="Publication date (IST)" type="date" value={scheduleDate} onChange={setScheduleDate} required /><Field label="Publication time (IST)" type="time" value={scheduleTime} onChange={setScheduleTime} required /><button type="submit" className="admin-primary">Review schedule</button><button type="button" onClick={() => setScheduleStep(null)}>Cancel</button></form> : <><h3>{article.title}</h3><p>{formatPublicationTime(scheduleInstant)}</p><p>The article remains private until publication. The server checks due articles every minute; publication can take longer during outages or a large queue.</p><button type="button" className="admin-primary" disabled={busy} onClick={() => void persist('scheduled', scheduleInstant)}>{saving ? 'Scheduling…' : 'Confirm schedule'}</button><button type="button" disabled={busy} onClick={() => setScheduleStep('choose')}>Change date / time</button><button type="button" disabled={busy} onClick={() => setScheduleStep(null)}>Cancel</button></>}{scheduleError && <p className="admin-error" role="alert">{scheduleError}</p>}</div></div>}
+    {deleting && <div className="admin-modal-backdrop"><div className="admin-modal" role="alertdialog" aria-modal="true" aria-labelledby="delete-heading"><h2 id="delete-heading">Delete this draft?</h2><p>{deleting.document.title || 'Untitled draft'} is permanently deleted. Published articles cannot be deleted here.</p><button type="button" disabled={busy} onClick={() => setDeleting(null)}>Keep draft</button><button type="button" disabled={busy} onClick={() => void removeDraft()}>Confirm deletion</button></div></div>}
     {pendingAction && <div className="admin-modal-backdrop"><div className="admin-modal" role="alertdialog" aria-modal="true" aria-labelledby="discard-heading"><h2 id="discard-heading">Discard unsaved changes?</h2><p>Your saved article remains unchanged. Edits since your last save are lost if you continue.</p><button type="button" autoFocus onClick={() => setPendingAction(null)}>Keep editing</button><button type="button" onClick={() => { pendingAction(); setPendingAction(null); }}>Discard and continue</button></div></div>}
   </div>;
 }
